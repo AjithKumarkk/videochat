@@ -62,17 +62,43 @@ function Profile({ setToken, goBack }) {
     }
   };
 
+  const compressImage = (base64Str, maxWidth = 800) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ratio = maxWidth / img.width;
+        canvas.width = maxWidth;
+        canvas.height = img.height * ratio;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressedBase64);
+      };
+    });
+  };
+  
+  // Then modify handleSubmit to use this function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     
     try {
+      // Compress the image if it exists
+      let compressedProfilePic = profilePic;
+      if (profilePic && profilePic.startsWith('data:image')) {
+        compressedProfilePic = await compressImage(profilePic);
+      }
+      
       // Update user metadata in Supabase
       const { error } = await supabase.auth.updateUser({
         data: {
           username,
-          profile_pic: profilePic
+          profile_pic: compressedProfilePic
         }
       });
       
@@ -85,7 +111,14 @@ function Profile({ setToken, goBack }) {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      setError(error.message);
+      console.error('Profile update error:', error);
+      setError(error.message || 'Failed to update profile. Please try again.');
+      
+      // If it's an authentication error, redirect to login
+      if (error.message.includes('session') || error.message.includes('auth')) {
+        localStorage.removeItem('token');
+        setToken(null);
+      }
     } finally {
       setLoading(false);
     }

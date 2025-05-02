@@ -13,7 +13,7 @@ import Profile from './Profile';
 // Replace the socket connection with dynamic URL detection
 const socket = io(window.location.hostname === 'localhost' ? 
   'http://localhost:3001' : 
-  'https://your-render-backend-url.onrender.com', {
+  'https://videochat-backend-9xq8.onrender.com', {
   reconnectionAttempts: 5,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
@@ -24,7 +24,10 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    const savedMessages = localStorage.getItem('chatMessages');
+    return savedMessages ? JSON.parse(savedMessages) : [];
+  });
   const [file, setFile] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -49,30 +52,35 @@ function App() {
       const { data } = await supabase.auth.getUser();
       setUser(data?.user || null);
     };
-
+  
     if (token) {
       getUser();
     }
-
+  
     // Listen for auth changes
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event);
         if (session) {
           setToken(session.access_token);
           setUser(session.user);
           localStorage.setItem('token', session.access_token);
         } else {
-          setToken(null);
-          setUser(null);
-          localStorage.removeItem('token');
+          // Only clear the state if we're not already in the process of logging out
+          // This prevents the loop of logout -> login -> logout
+          if (token) {
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem('token');
+          }
         }
       }
     );
-
+  
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, [token]);
+  }, []); // Remove token from dependencies to prevent re-running this effect when token changes
 
   // Set up activity tracking
   useEffect(() => {
@@ -106,59 +114,100 @@ function App() {
   }, []);
 
   const handleLogout = async () => {
-    // The server will handle the disconnect event and announce the user left
-    await supabase.auth.signOut();
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
+    try {
+      // First remove the token from localStorage to prevent any reloading issues
+      localStorage.removeItem('token');
+      
+      // Then sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Finally update the state
+      setToken(null);
+      setUser(null);
+      setShowProfile(false); // Ensure profile page is closed if open
+      
+      // Force a small delay to ensure state updates are processed
+      setTimeout(() => {
+        // Double-check that token is still null (defensive programming)
+        if (localStorage.getItem('token')) {
+          localStorage.removeItem('token');
+          setToken(null);
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Force logout even if there's an error
+      localStorage.removeItem('token');
+      setToken(null);
+      setUser(null);
+    }
   };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Add this inside your useEffect that sets up socket listeners
   useEffect(() => {
-  // Existing socket listeners
-  socket.on('chat message', (data) => {
-  // Your existing code
-  });
+    // Properly handle incoming chat messages
+    socket.on('chat message', (data) => {
+      // Update activity timestamp when receiving messages
+      updateActivity();
+      
+      // For regular messages, add sender property if not present
+      if (data.type !== 'system' && !data.sender) {
+        // In a real app, you would get this from authentication
+        data.sender = currentUser;
+      }
+      
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages, data];
+        // Save to localStorage
+        localStorage.setItem('chatMessages', JSON.stringify(newMessages));
+        return newMessages;
+      });
+    });
+    
+    // Listen for clear chat event
+    socket.on('clear chat', () => {
+      setMessages([]);
+      localStorage.removeItem('chatMessages');
+    });
+    
+    // Add ping/pong to keep connection alive
+    const pingInterval = setInterval(() => {
+      socket.emit('ping');
+    }, 240000); // Send ping every 4 minutes
+    
+    socket.on('pong', () => {
+      console.log('Received pong from server');
+    });
+    
+    // Add reconnection handling
+    socket.on('connect', () => {
+      console.log('Connected to server');
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('Disconnected from server');
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+    });
   
-  // Add ping/pong to keep connection alive
-  const pingInterval = setInterval(() => {
-  socket.emit('ping');
-  }, 240000); // Send ping every 4 minutes
-  
-  socket.on('pong', () => {
-  console.log('Received pong from server');
-  });
-  
-  // Add reconnection handling
-  socket.on('connect', () => {
-  console.log('Connected to server');
-  });
-  
-  socket.on('disconnect', () => {
-  console.log('Disconnected from server');
-  });
-  
-  socket.on('connect_error', (error) => {
-  console.log('Connection error:', error);
-  });
-
-  return () => {
-  // Existing cleanup
-  socket.off('chat message');
-  socket.off('clear chat');
-  
-  // New cleanup
-  clearInterval(pingInterval);
-  socket.off('pong');
-  socket.off('connect');
-  socket.off('disconnect');
-  socket.off('connect_error');
-  };
-  }, []);
+    return () => {
+      // Existing cleanup
+      socket.off('chat message');
+      socket.off('clear chat');
+      
+      // New cleanup
+      clearInterval(pingInterval);
+      socket.off('pong');
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+    };
+  }, [currentUser]); // Add currentUser as a dependency
 
   useEffect(() => {
     scrollToBottom();
@@ -221,164 +270,164 @@ function App() {
 
   // Find the renderMessage function and update the system message rendering part
   const renderMessage = (msg, index) => {
-  // Handle system messages differently
-  if (msg.type === 'system') {
-  // Check if it's a join or leave message
-  const isJoinMessage = msg.content.includes('joined');
-  const isLeaveMessage = msg.content.includes('left');
-  
-  // Extract the timestamp (if available)
-  const timestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
-  const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  
-  // For join/leave messages, use the reference image style
-  if (isJoinMessage || isLeaveMessage) {
-  return (
-  <Box key={index} sx={{ 
-  display: 'flex', 
-  justifyContent: 'center',
-  my: 2,
-  px: 2
-  }}>
-  <Paper 
-  elevation={0} 
-  sx={{ 
-  width: '100%',
-  py: 1.5,
-  px: 2,
-  borderRadius: 1,
-  backgroundColor: '#f5f5f5',
-  color: '#666',
-  border: isLeaveMessage ? '1px solid #ff4d4f' : 'none',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center'
-  }}
-  >
-  <Typography variant="body2">
-  {msg.content}
-  </Typography>
-  <Typography variant="caption" color="text.secondary">
-  {isLeaveMessage ? 'now' : timeString}
-  </Typography>
-  </Paper>
-  </Box>
-  );
-  }
-  
-  // For other system messages, use the existing style
-  return (
-  <Box key={index} sx={{ 
-  display: 'flex', 
-  justifyContent: 'center',
-  my: 2
-  }}>
-  <Typography 
-  variant="caption" 
-  sx={{ 
-  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  color: '#aaa',
-  py: 0.5,
-  px: 2,
-  borderRadius: 10,
-  fontSize: '0.75rem'
-  }}
-  >
-  {msg.content}
-  </Typography>
-  </Box>
-  );
-  }
-  
-  // Rest of the renderMessage function remains unchanged
-  const isSentByMe = msg.sender === currentUser;
-  
-  // Common styles for all message bubbles
-  const bubbleStyle = {
-  maxWidth: '70%',
-  padding: '8px 16px',
-  borderRadius: '18px',
-  marginBottom: '8px',
-  position: 'relative',
-  // Different styles based on sender
-  backgroundColor: isSentByMe ? '#4285F4' : '#303030', // Blue for sent, dark gray for received
-  color: '#fff',
-  marginLeft: isSentByMe ? 'auto' : '0',
-  marginRight: isSentByMe ? '0' : 'auto',
-  borderTopRightRadius: isSentByMe ? '4px' : '18px',
-  borderTopLeftRadius: isSentByMe ? '18px' : '4px',
-  };
-  
-  const messageContainer = {
-  display: 'flex',
-  flexDirection: isSentByMe ? 'row-reverse' : 'row',
-  alignItems: 'flex-end',
-  marginBottom: '16px',
-  };
-  
-  // Determine avatar content - profile pic or initials
-  const avatarContent = (senderProfilePic, sender) => {
-  if (senderProfilePic) {
-  return <Avatar src={senderProfilePic} sx={{ width: 32, height: 32, mr: isSentByMe ? 0 : 1, ml: isSentByMe ? 1 : 0 }} />;
-  } else {
-  return (
-  <Avatar 
-  sx={{ 
-  width: 32, 
-  height: 32, 
-  mr: isSentByMe ? 0 : 1, 
-  ml: isSentByMe ? 1 : 0, 
-  bgcolor: isSentByMe ? '#4285F4' : '#764ba2'
-  }}
-  >
-  {getInitials(sender)}
-  </Avatar>
-  );
-  }
-  };
-  
-  if (msg.type === 'file') {
-  if (msg.fileType.startsWith('image/')) {
-  return (
-  <Box key={index} sx={messageContainer}>
-  {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  <Box sx={bubbleStyle}>
-  <Typography variant="caption" sx={{ display: 'block', mb: 1, color: '#ccc' }}>
-  {msg.name}
-  </Typography>
-  <img 
-  src={msg.data} 
-  alt={msg.name} 
-  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
-  />
-  </Box>
-  {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  </Box>
-  );
-  } else {
-  return (
-  <Box key={index} sx={messageContainer}>
-  {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  <Box sx={bubbleStyle}>
-  <Typography sx={{ wordBreak: 'break-word' }}>
-  📎 <a href={msg.data} download={msg.name} style={{ color: '#fff' }}>{msg.name}</a>
-  </Typography>
-  </Box>
-  {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  </Box>
-  );
-  }
-  } else {
-  return (
-  <Box key={index} sx={messageContainer}>
-  {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  <Box sx={bubbleStyle}>
-  <Typography sx={{ wordBreak: 'break-word' }}>{msg.content}</Typography>
-  </Box>
-  {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-  </Box>
-  );
-  }
+    // Handle system messages differently
+    if (msg.type === 'system') {
+      // Check if it's a join or leave message
+      const isJoinMessage = msg.content.includes('joined');
+      const isLeaveMessage = msg.content.includes('left');
+      
+      // Extract the timestamp (if available)
+      const timestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
+      const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // For join/leave messages, use the reference image style
+      if (isJoinMessage || isLeaveMessage) {
+        return (
+          <Box key={index} sx={{ 
+            display: 'flex', 
+            justifyContent: 'center',
+            my: 2,
+            px: 2
+          }}>
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                width: '100%',
+                py: 1.5,
+                px: 2,
+                borderRadius: 1,
+                backgroundColor: '#f5f5f5',
+                color: '#666',
+                border: isLeaveMessage ? '1px solid #ff4d4f' : 'none',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <Typography variant="body2">
+                {msg.content}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {isLeaveMessage ? 'now' : timeString}
+              </Typography>
+            </Paper>
+          </Box>
+        );
+      }
+      
+      // For other system messages, use the existing style
+      return (
+        <Box key={index} sx={{ 
+          display: 'flex', 
+          justifyContent: 'center',
+          my: 2
+        }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              color: '#aaa',
+              py: 0.5,
+              px: 2,
+              borderRadius: 10,
+              fontSize: '0.75rem'
+            }}
+          >
+            {msg.content}
+          </Typography>
+        </Box>
+      );
+    }
+    
+    // Rest of the renderMessage function remains unchanged
+    const isSentByMe = msg.sender === currentUser;
+    
+    // Common styles for all message bubbles
+    const bubbleStyle = {
+      maxWidth: '70%',
+      padding: '8px 16px',
+      borderRadius: '18px',
+      marginBottom: '8px',
+      position: 'relative',
+      // Different styles based on sender
+      backgroundColor: isSentByMe ? '#4285F4' : '#303030', // Blue for sent, dark gray for received
+      color: '#fff',
+      marginLeft: isSentByMe ? 'auto' : '0',
+      marginRight: isSentByMe ? '0' : 'auto',
+      borderTopRightRadius: isSentByMe ? '4px' : '18px',
+      borderTopLeftRadius: isSentByMe ? '18px' : '4px',
+    };
+    
+    const messageContainer = {
+      display: 'flex',
+      flexDirection: isSentByMe ? 'row-reverse' : 'row',
+      alignItems: 'flex-end',
+      marginBottom: '16px',
+    };
+    
+    // Determine avatar content - profile pic or initials
+    const avatarContent = (senderProfilePic, sender) => {
+      if (senderProfilePic) {
+        return <Avatar src={senderProfilePic} sx={{ width: 32, height: 32, mr: isSentByMe ? 0 : 1, ml: isSentByMe ? 1 : 0 }} />;
+      } else {
+        return (
+          <Avatar 
+            sx={{ 
+              width: 32, 
+              height: 32, 
+              mr: isSentByMe ? 0 : 1, 
+              ml: isSentByMe ? 1 : 0, 
+              bgcolor: isSentByMe ? '#4285F4' : '#764ba2'
+            }}
+          >
+            {getInitials(sender)}
+          </Avatar>
+        );
+      }
+    };
+    
+    if (msg.type === 'file') {
+      if (msg.fileType.startsWith('image/')) {
+        return (
+          <Box key={index} sx={messageContainer}>
+            {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+            <Box sx={bubbleStyle}>
+              <Typography variant="caption" sx={{ display: 'block', mb: 1, color: '#ccc' }}>
+                {msg.name}
+              </Typography>
+              <img 
+                src={msg.data} 
+                alt={msg.name} 
+                style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
+              />
+            </Box>
+            {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+          </Box>
+        );
+      } else {
+        return (
+          <Box key={index} sx={messageContainer}>
+            {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+            <Box sx={bubbleStyle}>
+              <Typography sx={{ wordBreak: 'break-word' }}>
+                📎 <a href={msg.data} download={msg.name} style={{ color: '#fff' }}>{msg.name}</a>
+              </Typography>
+            </Box>
+            {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+          </Box>
+        );
+      }
+    } else {
+      return (
+        <Box key={index} sx={messageContainer}>
+          {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+          <Box sx={bubbleStyle}>
+            <Typography sx={{ wordBreak: 'break-word' }}>{msg.content}</Typography>
+          </Box>
+          {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+        </Box>
+      );
+    }
   };
 
   // If no token, show login screen

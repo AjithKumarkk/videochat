@@ -60,6 +60,7 @@ io.on('connection', (socket) => {
     });
     
     // Update the disconnect event handler
+    // Add this after the disconnect event handler in the socket.on('connection') block
     socket.on('disconnect', () => {
         console.log('User disconnected');
         
@@ -77,6 +78,17 @@ io.on('connection', (socket) => {
             
             // Remove user from connected users
             connectedUsers.delete(socket.id);
+            
+            // If no users left, clear the chat
+            if (connectedUsers.size === 0) {
+                console.log('No users left in chat, clearing messages');
+                io.emit('chat message', {
+                    type: 'system',
+                    content: 'Chat has been cleared as no users are present',
+                    timestamp: new Date().toISOString()
+                });
+                io.emit('clear chat');
+            }
         }
     });
     socket.on('chat message', (data) => {
