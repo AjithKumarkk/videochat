@@ -112,8 +112,25 @@ function Login({ setToken }) {
       
       setLoading(true);
       
+      // Inside handleRegistrationStep, replace the existing registration code with:
+      
       try {
-        // Check if email already exists
+        // Generate a username from email if not provided
+        if (!username.trim()) {
+          const baseUsername = generateUsernameFromEmail(email);
+          username = await generateUniqueUsername(baseUsername);
+          setUsername(username); // Update the state
+        } else {
+          // Check if the provided username is unique
+          const exists = await checkUsernameExists(username);
+          if (exists) {
+            setError('Username already taken. Please choose another one.');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Register the user
         const { data, error } = await supabase.auth.signUp({
           email: email,
           password: password,
@@ -126,6 +143,21 @@ function Login({ setToken }) {
         });
         
         if (error) throw error;
+        
+        // Create entry in user_profiles table
+        if (data?.user) {
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .insert([
+              { 
+                id: data.user.id,
+                username: username,
+                profile_pic: null
+              }
+            ]);
+            
+          if (profileError) console.error('Error creating profile:', profileError);
+        }
         
         setVerificationSent(true);
         setActiveStep(1);
@@ -450,3 +482,37 @@ function Login({ setToken }) {
 }
 
 export default Login;
+
+
+// Add this function after isValidEmail
+// Generate username from email
+const generateUsernameFromEmail = (email) => {
+  return email.split('@')[0].toLowerCase();
+};
+
+// Check if username exists
+const checkUsernameExists = async (username) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('username')
+    .eq('username', username)
+    .single();
+    
+  return data !== null;
+};
+
+// Generate a unique username
+const generateUniqueUsername = async (baseUsername) => {
+  let username = baseUsername;
+  let exists = await checkUsernameExists(username);
+  let counter = 1;
+  
+  // If username exists, append a number until we find a unique one
+  while (exists) {
+    username = `${baseUsername}${counter}`;
+    exists = await checkUsernameExists(username);
+    counter++;
+  }
+  
+  return username;
+};

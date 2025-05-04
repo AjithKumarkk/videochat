@@ -13,6 +13,7 @@ import {
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { supabase } from './supabaseClient';
+import styles from './Profile.module.css'; // Import the CSS module
 
 function Profile({ setToken, goBack }) {
   const [username, setUsername] = useState(localStorage.getItem('username') || '');
@@ -81,32 +82,66 @@ function Profile({ setToken, goBack }) {
     });
   };
   
-  // Then modify handleSubmit to use this function
+  // Modify the handleSubmit function
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     
     try {
+      // Check if username changed and if it's unique
+      const currentUsername = localStorage.getItem('username');
+      if (username !== currentUsername) {
+        const exists = await supabase
+          .from('user_profiles')
+          .select('username')
+          .eq('username', username)
+          .not('id', 'eq', (await supabase.auth.getUser()).data.user.id)
+          .single();
+          
+        if (exists.data) {
+          setError('Username already taken. Please choose another one.');
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Compress the image if it exists
       let compressedProfilePic = profilePic;
       if (profilePic && profilePic.startsWith('data:image')) {
         compressedProfilePic = await compressImage(profilePic);
       }
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) throw new Error('User not found');
+      
       // Update user metadata in Supabase
-      const { error } = await supabase.auth.updateUser({
+      const { error: metadataError } = await supabase.auth.updateUser({
         data: {
           username,
           profile_pic: compressedProfilePic
         }
       });
       
-      if (error) throw error;
+      if (metadataError) throw metadataError;
+      
+      // Update user_profiles table
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          username: username,
+          profile_pic: compressedProfilePic,
+          updated_at: new Date()
+        });
+      
+      if (profileError) throw profileError;
       
       // Store in localStorage for easy access
       localStorage.setItem('username', username);
-      localStorage.setItem('profilePic', profilePic);
+      localStorage.setItem('profilePic', compressedProfilePic);
       
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -135,93 +170,84 @@ function Profile({ setToken, goBack }) {
       height: '100vh', 
       display: 'flex', 
       flexDirection: 'column',
-      bgcolor: '#212121', 
-      color: '#fff'
+      background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
+      color: '#fff',
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     }}>
       {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        p: 2, 
-        borderBottom: '1px solid #333',
-        bgcolor: '#212121'
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton onClick={goBack} sx={{ color: '#fff' }}>
+      <Box className={styles.header}>
+        <Box className={styles.headerLeft}>
+          <IconButton 
+            onClick={goBack} 
+            sx={{ 
+              color: '#fff',
+              background: 'rgba(255, 255, 255, 0.05)',
+              '&:hover': {
+                background: 'rgba(255, 255, 255, 0.1)',
+              }
+            }}
+          >
             <ArrowBackIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ ml: 2 }}>
-            Profile
+          <Typography variant="h6" className={styles.titleText}>
+            PROFILE SETTINGS
           </Typography>
         </Box>
       </Box>
       
       {/* Profile Content */}
-      <Box sx={{ 
-        flexGrow: 1, 
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        p: 3
-      }}>
+      <Box className={styles.profileContainer}>
         <Paper 
-          elevation={3} 
-          sx={{ 
-            width: '100%', 
-            maxWidth: 500, 
-            p: 4, 
-            bgcolor: '#303030',
-            borderRadius: 2
-          }}
+          elevation={0} 
+          className={styles.profileCard}
         >
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+            <Alert 
+              severity="error" 
+              sx={{ 
+                mb: 3, 
+                backgroundColor: 'rgba(211, 47, 47, 0.1)', 
+                color: '#ff8a80',
+                border: '1px solid rgba(211, 47, 47, 0.3)',
+                '& .MuiAlert-icon': {
+                  color: '#ff8a80'
+                }
+              }}
+            >
               {error}
             </Alert>
           )}
           
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            mb: 4
-          }}>
-            <Box sx={{ position: 'relative', mb: 3 }}>
-              <Avatar 
-                src={profilePic} 
-                sx={{ 
-                  width: 120, 
-                  height: 120, 
-                  fontSize: '2.5rem',
-                  bgcolor: profilePic ? 'transparent' : '#4285F4'
-                }}
-              >
-                {!profilePic && getInitials()}
-              </Avatar>
-              <IconButton 
-                onClick={() => fileInputRef.current.click()}
-                sx={{ 
-                  position: 'absolute', 
-                  bottom: 0, 
-                  right: 0, 
-                  bgcolor: '#4285F4',
-                  '&:hover': { bgcolor: '#3367d6' },
-                  color: '#fff'
-                }}
-              >
-                <PhotoCameraIcon />
-              </IconButton>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-              />
-            </Box>
+          <Box className={styles.avatarContainer}>
+            <Avatar 
+              src={profilePic} 
+              className={styles.avatar}
+            >
+              {!profilePic && getInitials()}
+            </Avatar>
+            <IconButton 
+              onClick={() => fileInputRef.current.click()}
+              className={styles.cameraButton}
+            >
+              <PhotoCameraIcon />
+            </IconButton>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+            />
             
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, color: '#aaa' }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mt: 2, 
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: '0.85rem',
+                letterSpacing: '0.5px'
+              }}
+            >
               Upload a profile picture (max 2MB)
             </Typography>
           </Box>
@@ -235,15 +261,25 @@ function Profile({ setToken, goBack }) {
               required
               variant="outlined"
               sx={{ 
-                mb: 3,
+                mb: 4,
                 '& .MuiOutlinedInput-root': {
                   color: '#fff',
-                  '& fieldset': { borderColor: '#555' },
-                  '&:hover fieldset': { borderColor: '#777' },
-                  '&.Mui-focused fieldset': { borderColor: '#4285F4' }
+                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.3)' },
+                  '&.Mui-focused fieldset': { 
+                    borderColor: 'transparent',
+                    borderWidth: 2,
+                    borderImage: 'linear-gradient(90deg, #00dbde 0%, #fc00ff 100%) 1'
+                  }
                 },
                 '& .MuiInputLabel-root': {
-                  color: '#aaa'
+                  color: 'rgba(255, 255, 255, 0.6)'
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: '#00dbde'
+                },
+                '& .MuiInputBase-input': {
+                  padding: '14px 16px'
                 }
               }}
             />
@@ -253,13 +289,7 @@ function Profile({ setToken, goBack }) {
               fullWidth
               variant="contained"
               disabled={loading}
-              sx={{ 
-                py: 1.5,
-                background: 'linear-gradient(90deg, #4776E6 0%, #8E54E9 100%)',
-                borderRadius: 1,
-                textTransform: 'none',
-                fontSize: '1rem'
-              }}
+              className={styles.saveButton}
             >
               {loading ? 'Saving...' : 'Save Profile'}
             </Button>
@@ -267,8 +297,24 @@ function Profile({ setToken, goBack }) {
         </Paper>
       </Box>
       
-      <Snackbar open={success} autoHideDuration={3000} onClose={() => setSuccess(false)}>
-        <Alert severity="success" sx={{ width: '100%' }}>
+      <Snackbar 
+        open={success} 
+        autoHideDuration={3000} 
+        onClose={() => setSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert 
+          severity="success" 
+          sx={{ 
+            width: '100%',
+            backgroundColor: 'rgba(46, 125, 50, 0.1)',
+            color: '#69f0ae',
+            border: '1px solid rgba(46, 125, 50, 0.3)',
+            '& .MuiAlert-icon': {
+              color: '#69f0ae'
+            }
+          }}
+        >
           Profile updated successfully!
         </Alert>
       </Snackbar>

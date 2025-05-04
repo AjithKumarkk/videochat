@@ -7,6 +7,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import io from 'socket.io-client';
 import { supabase } from './supabaseClient';
+import styles from './App.module.css';
 import Login from './Login';
 import Profile from './Profile';
 
@@ -268,167 +269,239 @@ function App() {
     return username.substring(0, 2).toUpperCase();
   };
 
-  // Find the renderMessage function and update the system message rendering part
+  // Update the renderMessage function to make message bubbles more futuristic
   const renderMessage = (msg, index) => {
-    // Handle system messages differently
-    if (msg.type === 'system') {
-      // Check if it's a join or leave message
-      const isJoinMessage = msg.content.includes('joined');
-      const isLeaveMessage = msg.content.includes('left');
-      
-      // Extract the timestamp (if available)
-      const timestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
-      const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      
-      // For join/leave messages, use the reference image style
-      if (isJoinMessage || isLeaveMessage) {
-        return (
-          <Box key={index} sx={{ 
-            display: 'flex', 
-            justifyContent: 'center',
-            my: 2,
-            px: 2
-          }}>
-            <Paper 
-              elevation={0} 
-              sx={{ 
-                width: '100%',
-                py: 1.5,
-                px: 2,
-                borderRadius: 1,
-                backgroundColor: '#f5f5f5',
-                color: '#666',
-                border: isLeaveMessage ? '1px solid #ff4d4f' : 'none',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <Typography variant="body2">
-                {msg.content}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {isLeaveMessage ? 'now' : timeString}
-              </Typography>
-            </Paper>
-          </Box>
-        );
-      }
-      
-      // For other system messages, use the existing style
+  // Handle system messages differently
+  if (msg.type === 'system') {
+  // Check if it's a join or leave message
+  const isJoinMessage = msg.content.includes('joined');
+  const isLeaveMessage = msg.content.includes('left');
+  
+  // Extract the timestamp (if available)
+  const timestamp = msg.timestamp ? new Date(msg.timestamp) : new Date();
+  const timeString = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  
+  // For join/leave messages, use a futuristic style
+  if (isJoinMessage || isLeaveMessage) {
+  return (
+    <Box key={index} sx={{ 
+      display: 'flex', 
+      justifyContent: 'center',
+      my: 2,
+      px: 2
+    }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          width: '100%',
+          py: 1.5,
+          px: 2,
+          borderRadius: 2,
+          backgroundColor: 'rgba(16, 18, 27, 0.6)',
+          backdropFilter: 'blur(10px)',
+          color: '#fff',
+          border: isLeaveMessage ? '1px solid rgba(255, 0, 92, 0.5)' : '1px solid rgba(0, 219, 222, 0.5)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <Typography variant="body2">
+          {msg.content}
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+          {isLeaveMessage ? 'now' : timeString}
+        </Typography>
+      </Paper>
+    </Box>
+  );
+  }
+  
+  // For other system messages, use a minimalist futuristic style
+  return (
+    <Box key={index} sx={{ 
+      display: 'flex', 
+      justifyContent: 'center',
+      my: 2
+    }}>
+      <Typography 
+        variant="caption" 
+        sx={{ 
+          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+          color: 'rgba(255, 255, 255, 0.7)',
+          py: 0.5,
+          px: 2,
+          borderRadius: 10,
+          fontSize: '0.75rem',
+          letterSpacing: '0.5px',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}
+      >
+        {msg.content}
+      </Typography>
+    </Box>
+  );
+  }
+  
+  // Regular messages with futuristic styling
+  const isSentByMe = msg.sender === currentUser;
+  
+  // Common styles for all message bubbles
+  const bubbleStyle = {
+    maxWidth: '70%',
+    padding: '10px 16px',
+    borderRadius: '18px',
+    marginBottom: '8px',
+    position: 'relative',
+    // Different styles based on sender
+    background: isSentByMe 
+      ? 'linear-gradient(135deg, #00dbde 0%, #fc00ff 100%)' 
+      : 'rgba(16, 18, 27, 0.6)',
+    backdropFilter: 'blur(10px)',
+    color: '#fff',
+    marginLeft: isSentByMe ? 'auto' : '0',
+    marginRight: isSentByMe ? '0' : 'auto',
+    borderTopRightRadius: isSentByMe ? '4px' : '18px',
+    borderTopLeftRadius: isSentByMe ? '18px' : '4px',
+    boxShadow: isSentByMe 
+      ? '0 4px 15px rgba(252, 0, 255, 0.3)' 
+      : '0 4px 15px rgba(0, 0, 0, 0.2)',
+    border: isSentByMe 
+      ? 'none' 
+      : '1px solid rgba(255, 255, 255, 0.1)',
+  };
+  
+  const messageContainer = {
+    display: 'flex',
+    flexDirection: isSentByMe ? 'row-reverse' : 'row',
+    alignItems: 'flex-end',
+    marginBottom: '16px',
+  };
+  
+  // Determine avatar content - profile pic or initials with futuristic styling
+  const avatarContent = (senderProfilePic, sender) => {
+    if (senderProfilePic) {
       return (
-        <Box key={index} sx={{ 
-          display: 'flex', 
-          justifyContent: 'center',
-          my: 2
-        }}>
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              color: '#aaa',
-              py: 0.5,
-              px: 2,
-              borderRadius: 10,
-              fontSize: '0.75rem'
-            }}
-          >
-            {msg.content}
-          </Typography>
-        </Box>
+        <Avatar 
+          src={senderProfilePic} 
+          sx={{ 
+            width: 36, 
+            height: 36, 
+            mr: isSentByMe ? 0 : 1, 
+            ml: isSentByMe ? 1 : 0,
+            border: isSentByMe 
+              ? '2px solid rgba(252, 0, 255, 0.7)' 
+              : '2px solid rgba(0, 219, 222, 0.7)',
+            boxShadow: isSentByMe 
+              ? '0 0 10px rgba(252, 0, 255, 0.5)' 
+              : '0 0 10px rgba(0, 219, 222, 0.5)'
+          }} 
+        />
+      );
+    } else {
+      return (
+        <Avatar 
+          sx={{ 
+            width: 36, 
+            height: 36, 
+            mr: isSentByMe ? 0 : 1, 
+            ml: isSentByMe ? 1 : 0, 
+            background: isSentByMe 
+              ? 'linear-gradient(135deg, #fc00ff 0%, #00dbde 100%)' 
+              : 'linear-gradient(135deg, #00dbde 0%, #fc00ff 100%)',
+            boxShadow: isSentByMe 
+              ? '0 0 10px rgba(252, 0, 255, 0.5)' 
+              : '0 0 10px rgba(0, 219, 222, 0.5)'
+          }}
+        >
+          {getInitials(sender)}
+        </Avatar>
       );
     }
-    
-    // Rest of the renderMessage function remains unchanged
-    const isSentByMe = msg.sender === currentUser;
-    
-    // Common styles for all message bubbles
-    const bubbleStyle = {
-      maxWidth: '70%',
-      padding: '8px 16px',
-      borderRadius: '18px',
-      marginBottom: '8px',
-      position: 'relative',
-      // Different styles based on sender
-      backgroundColor: isSentByMe ? '#4285F4' : '#303030', // Blue for sent, dark gray for received
-      color: '#fff',
-      marginLeft: isSentByMe ? 'auto' : '0',
-      marginRight: isSentByMe ? '0' : 'auto',
-      borderTopRightRadius: isSentByMe ? '4px' : '18px',
-      borderTopLeftRadius: isSentByMe ? '18px' : '4px',
-    };
-    
-    const messageContainer = {
-      display: 'flex',
-      flexDirection: isSentByMe ? 'row-reverse' : 'row',
-      alignItems: 'flex-end',
-      marginBottom: '16px',
-    };
-    
-    // Determine avatar content - profile pic or initials
-    const avatarContent = (senderProfilePic, sender) => {
-      if (senderProfilePic) {
-        return <Avatar src={senderProfilePic} sx={{ width: 32, height: 32, mr: isSentByMe ? 0 : 1, ml: isSentByMe ? 1 : 0 }} />;
-      } else {
-        return (
-          <Avatar 
-            sx={{ 
-              width: 32, 
-              height: 32, 
-              mr: isSentByMe ? 0 : 1, 
-              ml: isSentByMe ? 1 : 0, 
-              bgcolor: isSentByMe ? '#4285F4' : '#764ba2'
-            }}
-          >
-            {getInitials(sender)}
-          </Avatar>
-        );
-      }
-    };
-    
-    if (msg.type === 'file') {
-      if (msg.fileType.startsWith('image/')) {
-        return (
-          <Box key={index} sx={messageContainer}>
-            {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-            <Box sx={bubbleStyle}>
-              <Typography variant="caption" sx={{ display: 'block', mb: 1, color: '#ccc' }}>
-                {msg.name}
-              </Typography>
+  };
+  
+  if (msg.type === 'file') {
+    if (msg.fileType.startsWith('image/')) {
+      return (
+        <Box key={index} sx={messageContainer}>
+          {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+          <Box sx={bubbleStyle}>
+            <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'rgba(255, 255, 255, 0.7)' }}>
+              {msg.name}
+            </Typography>
+            <Box sx={{ 
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                pointerEvents: 'none'
+              }
+            }}>
               <img 
                 src={msg.data} 
                 alt={msg.name} 
-                style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: '8px' }} 
+                style={{ 
+                  maxWidth: '100%', 
+                  maxHeight: '200px', 
+                  borderRadius: '8px',
+                  display: 'block'
+                }} 
               />
             </Box>
-            {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
           </Box>
-        );
-      } else {
-        return (
-          <Box key={index} sx={messageContainer}>
-            {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-            <Box sx={bubbleStyle}>
-              <Typography sx={{ wordBreak: 'break-word' }}>
-                📎 <a href={msg.data} download={msg.name} style={{ color: '#fff' }}>{msg.name}</a>
-              </Typography>
-            </Box>
-            {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
-          </Box>
-        );
-      }
+          {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+        </Box>
+      );
     } else {
       return (
         <Box key={index} sx={messageContainer}>
           {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
           <Box sx={bubbleStyle}>
-            <Typography sx={{ wordBreak: 'break-word' }}>{msg.content}</Typography>
+            <Typography sx={{ 
+              wordBreak: 'break-word',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              <span style={{ 
+                marginRight: '8px',
+                fontSize: '1.2rem',
+                filter: 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.5))'
+              }}>📎</span> 
+              <a 
+                href={msg.data} 
+                download={msg.name} 
+                style={{ 
+                  color: '#fff',
+                  textDecoration: 'none',
+                  borderBottom: '1px dashed rgba(255, 255, 255, 0.5)'
+                }}
+              >
+                {msg.name}
+              </a>
+            </Typography>
           </Box>
           {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
         </Box>
       );
     }
-  };
+  } else {
+    return (
+      <Box key={index} sx={messageContainer}>
+        {!isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+        <Box sx={bubbleStyle}>
+          <Typography sx={{ wordBreak: 'break-word' }}>{msg.content}</Typography>
+        </Box>
+        {isSentByMe && avatarContent(msg.senderProfilePic, msg.sender)}
+      </Box>
+    );
+  }
+};
 
   // If no token, show login screen
   if (!token) {
@@ -445,38 +518,63 @@ function App() {
       height: '100vh', 
       display: 'flex', 
       flexDirection: 'column',
-      bgcolor: '#212121', // Dark background
-      color: '#fff'
+      background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)', // Futuristic gradient background
+      color: '#fff',
+      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
     }}>
       {/* Header */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        p: 2, 
-        borderBottom: '1px solid #333',
-        bgcolor: '#212121'
-      }}>
+      <Box className={styles.header}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <IconButton onClick={handleLogout} sx={{ color: '#fff' }}>
+          <IconButton 
+            onClick={handleLogout} 
+            sx={{ 
+              color: '#fff',
+              background: 'rgba(255, 255, 255, 0.05)',
+              '&:hover': {
+                background: 'rgba(255, 255, 255, 0.1)',
+              }
+            }}
+          >
             <LogoutIcon />
           </IconButton>
-          <Typography variant="h6" sx={{ ml: 2 }}>
-            Chat
+          <Typography variant="h6" className={styles.logoText}>
+            NEXUS CHAT
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <IconButton 
             onClick={() => setShowProfile(true)} 
-            sx={{ color: '#fff', mr: 1 }}
+            sx={{ 
+              color: '#fff', 
+              mr: 1,
+              background: 'rgba(255, 255, 255, 0.05)',
+              '&:hover': {
+                background: 'rgba(255, 255, 255, 0.1)',
+              }
+            }}
           >
             {profilePic ? (
-              <Avatar src={profilePic} sx={{ width: 32, height: 32 }} />
+              <Avatar 
+                src={profilePic} 
+                sx={{ 
+                  width: 32, 
+                  height: 32,
+                  border: '2px solid rgba(0, 219, 222, 0.7)'
+                }} 
+              />
             ) : (
               <AccountCircleIcon />
             )}
           </IconButton>
-          <IconButton sx={{ color: '#fff' }}>
+          <IconButton 
+            sx={{ 
+              color: '#fc00ff',
+              background: 'rgba(255, 255, 255, 0.05)',
+              '&:hover': {
+                background: 'rgba(255, 255, 255, 0.1)',
+              }
+            }}
+          >
             <VideocamIcon />
           </IconButton>
         </Box>
@@ -487,9 +585,18 @@ function App() {
         flexGrow: 1, 
         overflow: 'auto', 
         p: 2,
-        bgcolor: '#212121',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        '&::-webkit-scrollbar': {
+          width: '8px',
+        },
+        '&::-webkit-scrollbar-track': {
+          background: 'rgba(255, 255, 255, 0.05)',
+        },
+        '&::-webkit-scrollbar-thumb': {
+          background: 'linear-gradient(180deg, #00dbde 0%, #fc00ff 100%)',
+          borderRadius: '4px',
+        },
       }}>
         {/* Date Divider */}
         <Box sx={{ 
@@ -498,9 +605,20 @@ function App() {
           my: 3,
           color: '#aaa'
         }}>
-          <Box sx={{ flex: 1, height: '1px', bgcolor: '#333' }} />
-          <Typography variant="body2" sx={{ px: 2 }}>Today</Typography>
-          <Box sx={{ flex: 1, height: '1px', bgcolor: '#333' }} />
+          <Box sx={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(0,219,222,0) 0%, rgba(0,219,222,0.5) 50%, rgba(0,219,222,0) 100%)' }} />
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              px: 2,
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.75rem',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}
+          >
+            Today
+          </Typography>
+          <Box sx={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(252,0,255,0) 0%, rgba(252,0,255,0.5) 50%, rgba(252,0,255,0) 100%)' }} />
         </Box>
         
         {messages.map((msg, index) => renderMessage(msg, index))}
@@ -508,20 +626,16 @@ function App() {
       </Box>
       
       {/* Message Input */}
-      <Box 
-        component="form" 
-        onSubmit={handleSubmit} 
-        sx={{ 
-          display: 'flex', 
-          p: 2, 
-          borderTop: '1px solid #333',
-          bgcolor: '#1a1a1a',
-          alignItems: 'center'
-        }}
-      >
+      <Box component="form" onSubmit={handleSubmit} className={styles.messageForm}>
         <IconButton 
           onClick={() => fileInputRef.current.click()}
-          sx={{ color: '#aaa' }}
+          sx={{ 
+            color: '#00dbde',
+            background: 'rgba(255, 255, 255, 0.05)',
+            '&:hover': {
+              background: 'rgba(255, 255, 255, 0.1)',
+            }
+          }}
         >
           <AttachFileIcon />
         </IconButton>
@@ -543,22 +657,32 @@ function App() {
           sx={{ 
             mx: 2,
             '& .MuiInputBase-root': {
-              color: '#fff'
+              color: '#fff',
+              '&::before': {
+                borderBottom: 'none'
+              }
             },
             '& .MuiInput-underline:before': {
-              borderBottomColor: '#333'
+              borderBottomColor: 'rgba(255, 255, 255, 0.2)'
             },
             '& .MuiInput-underline:hover:not(.Mui-disabled):before': {
-              borderBottomColor: '#555'
+              borderBottomColor: 'rgba(255, 255, 255, 0.3)'
             },
             '& .MuiInput-underline:after': {
-              borderBottomColor: '#4285F4'
+              borderImage: 'linear-gradient(90deg, #00dbde 0%, #fc00ff 100%)',
+              borderImageSlice: 1
             }
           }}
         />
         <IconButton 
           type="submit" 
-          sx={{ color: '#4285F4' }}
+          sx={{ 
+            background: 'linear-gradient(90deg, #00dbde 0%, #fc00ff 100%)',
+            color: '#fff',
+            '&:hover': {
+              opacity: 0.9,
+            }
+          }}
         >
           <SendIcon />
         </IconButton>
@@ -568,9 +692,10 @@ function App() {
       {file && (
         <Box sx={{ 
           p: 1, 
-          bgcolor: '#333', 
+          bgcolor: 'rgba(0, 219, 222, 0.1)', 
           color: '#fff',
-          fontSize: '0.75rem'
+          fontSize: '0.75rem',
+          borderTop: '1px solid rgba(0, 219, 222, 0.3)'
         }}>
           Selected file: {file.name}
         </Box>
@@ -580,3 +705,19 @@ function App() {
 }
 
 export default App;
+
+// Fetch user profile from Supabase
+const fetchUserProfile = async (username) => {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('username, profile_pic')
+    .eq('username', username)
+    .single();
+    
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+  
+  return data;
+};

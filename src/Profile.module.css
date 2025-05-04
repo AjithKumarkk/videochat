@@ -1,0 +1,109 @@
+/* Profile.module.css */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  background-color: rgba(16, 18, 27, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+}
+
+.titleText {
+  margin-left: 16px;
+  font-weight: 500;
+  background: linear-gradient(90deg, #00dbde 0%, #fc00ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 15px rgba(252, 0, 255, 0.3), 0 0 10px rgba(0, 219, 222, 0.3);
+}
+
+.profileContainer {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.profileContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.profileContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.profileContainer::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00dbde 0%, #fc00ff 100%);
+  border-radius: 4px;
+}
+
+.profileCard {
+  width: 100%;
+  max-width: 500px;
+  padding: 32px;
+  background-color: rgba(16, 18, 27, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.avatarContainer {
+  position: relative;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.avatar {
+  width: 140px;
+  height: 140px;
+  font-size: 3rem;
+  background-color: rgba(0, 219, 222, 0.2);
+  border: 3px solid rgba(0, 219, 222, 0.7);
+  box-shadow: 0 0 20px rgba(0, 219, 222, 0.5);
+  transition: all 0.3s ease;
+}
+
+.cameraButton {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background: linear-gradient(135deg, #00dbde 0%, #fc00ff 100%);
+  color: #fff;
+  width: 48px;
+  height: 48px;
+  box-shadow: 0 4px 10px rgba(252, 0, 255, 0.3);
+}
+
+.cameraButton:hover {
+  opacity: 0.9;
+}
+
+.saveButton {
+  padding: 12px 0;
+  background: linear-gradient(90deg, #00dbde 0%, #fc00ff 100%);
+  border-radius: 4px;
+  text-transform: none;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(252, 0, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.saveButton:hover {
+  opacity: 0.9;
+  box-shadow: 0 6px 20px rgba(252, 0, 255, 0.4);
+}
